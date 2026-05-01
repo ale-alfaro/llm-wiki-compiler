@@ -22,32 +22,12 @@ describe("generateIndex", () => {
     expect(index).toContain("## Concepts");
   });
 
-  it("includes saved query pages in a separate section", async () => {
-    await writePage(path.join(root, "wiki/concepts"), "alpha", { title: "Alpha", summary: "A concept" }, "Body of Alpha.");
-    await writePage(path.join(root, "wiki/queries"), "what-is-alpha", { title: "What is Alpha?", summary: "A query answer" }, "Body of What is Alpha?.");
-    const index = await generateAndReadIndex(root);
-
-    expect(index).toContain("## Concepts");
-    expect(index).toContain("[[alpha|Alpha]]");
-    expect(index).toContain("## Saved Queries");
-    expect(index).toContain("[[what-is-alpha|What is Alpha?]]");
-  });
-
-  it("omits Saved Queries section when no queries exist", async () => {
-    await writePage(path.join(root, "wiki/concepts"), "beta", { title: "Beta", summary: "A concept" }, "Body of Beta.");
-    const index = await generateAndReadIndex(root);
-
-    expect(index).toContain("## Concepts");
-    expect(index).not.toContain("## Saved Queries");
-  });
-
   it("reports correct total page count", async () => {
     await writePage(path.join(root, "wiki/concepts"), "a", { title: "A", summary: "s" }, "Body.");
     await writePage(path.join(root, "wiki/concepts"), "b", { title: "B", summary: "s" }, "Body.");
-    await writePage(path.join(root, "wiki/queries"), "q", { title: "Q", summary: "s" }, "Body.");
     const index = await generateAndReadIndex(root);
 
-    expect(index).toContain("3 pages");
+    expect(index).toContain("2 pages");
   });
 
   it("handles empty wiki gracefully", async () => {

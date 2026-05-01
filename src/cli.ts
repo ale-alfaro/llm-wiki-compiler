@@ -1,27 +1,18 @@
 /**
- * CLI entry point for llmwiki — the knowledge compiler.
+ * CLI entry point for llmwiki — the compile-only foundation.
  *
- * Registers all commands (ingest, compile, query, watch, lint) via Commander.
- * Validates the correct API key for the selected LLM provider.
- * Designed for `npx llmwiki` or global install via `npm install -g llm-wiki-compiler`.
+ * Registers compile and review subcommands via Commander and validates
+ * the active LLM provider's credentials before any LLM-backed action runs.
  */
 
 import "dotenv/config";
 import { createRequire } from "module";
 import { Command } from "commander";
-import ingestCommand from "./commands/ingest.js";
-import ingestSessionCommand from "./commands/ingest-session.js";
 import compileCommand from "./commands/compile.js";
-import queryCommand from "./commands/query.js";
-import watchCommand from "./commands/watch.js";
-import lintCommand from "./commands/lint.js";
-import exportCommand from "./commands/export.js";
-import { schemaInitCommand, schemaShowCommand } from "./commands/schema.js";
 import reviewListCommand from "./commands/review-list.js";
 import reviewShowCommand from "./commands/review-show.js";
 import reviewApproveCommand from "./commands/review-approve.js";
 import reviewRejectCommand from "./commands/review-reject.js";
-import { startMCPServer } from "./mcp/server.js";
 import { DEFAULT_PROVIDER } from "./utils/constants.js";
 import { resolveAnthropicAuthFromEnv } from "./utils/claude-settings.js";
 
@@ -32,32 +23,8 @@ const program = new Command();
 
 program
   .name("llmwiki")
-  .description("The knowledge compiler — raw sources in, interlinked wiki out")
+  .description("Compile raw sources into an interlinked markdown wiki")
   .version(version);
-
-program
-  .command("ingest <source>")
-  .description("Ingest a URL or local file into sources/")
-  .action(async (source: string) => {
-    try {
-      await ingestCommand(source);
-    } catch (err) {
-      console.error(`\x1b[31mError:\x1b[0m ${err instanceof Error ? err.message : err}`);
-      process.exit(1);
-    }
-  });
-
-program
-  .command("ingest-session <path>")
-  .description("Ingest a coding-agent session export (Claude, Codex, Cursor) into sources/")
-  .action(async (targetPath: string) => {
-    try {
-      await ingestSessionCommand(targetPath);
-    } catch (err) {
-      console.error(`\x1b[31mError:\x1b[0m ${err instanceof Error ? err.message : err}`);
-      process.exit(1);
-    }
-  });
 
 program
   .command("compile")
@@ -133,120 +100,10 @@ reviewCommand
     }
   });
 
-program
-  .command("query <question>")
-  .description("Ask a question against the wiki")
-  .option("--save", "Save the answer as a wiki page")
-  .option("--debug", "Print which pages and chunks were selected and their scores")
-  .option(
-    "--lang <code>",
-    "Target language for the answer (e.g. \"Chinese\", \"ja\", \"zh-CN\"). Equivalent to setting LLMWIKI_OUTPUT_LANG.",
-  )
-  .action(
-    async (
-      question: string,
-      options: { save?: boolean; debug?: boolean; lang?: string },
-    ) => {
-      try {
-        applyLanguageOption(options.lang);
-        requireProvider();
-        await queryCommand(process.cwd(), question, options);
-      } catch (err) {
-        console.error(`\x1b[31mError:\x1b[0m ${err instanceof Error ? err.message : err}`);
-        process.exit(1);
-      }
-    },
-  );
-
-program
-  .command("watch")
-  .description("Watch sources/ and auto-recompile on changes")
-  .action(async () => {
-    try {
-      requireProvider();
-      await watchCommand();
-    } catch (err) {
-      console.error(`\x1b[31mError:\x1b[0m ${err instanceof Error ? err.message : err}`);
-      process.exit(1);
-    }
-  });
-
-program
-  .command("lint")
-  .description("Run rule-based quality checks against the wiki")
-  .action(async () => {
-    try {
-      await lintCommand();
-    } catch (err) {
-      console.error(`\x1b[31mError:\x1b[0m ${err instanceof Error ? err.message : err}`);
-      process.exit(1);
-    }
-  });
-
-const schemaCmd = program
-  .command("schema")
-  .description("Inspect or initialize the project's wiki schema config");
-
-schemaCmd
-  .command("init")
-  .description("Write a starter schema file to .llmwiki/schema.json")
-  .action(async () => {
-    try {
-      await schemaInitCommand();
-    } catch (err) {
-      console.error(`\x1b[31mError:\x1b[0m ${err instanceof Error ? err.message : err}`);
-      process.exit(1);
-    }
-  });
-
-schemaCmd
-  .command("show")
-  .description("Print the resolved schema for this project")
-  .action(async () => {
-    try {
-      await schemaShowCommand();
-    } catch (err) {
-      console.error(`\x1b[31mError:\x1b[0m ${err instanceof Error ? err.message : err}`);
-      process.exit(1);
-    }
-  });
-
-program
-  .command("export")
-  .description("Export wiki content to portable formats (llms.txt, JSON, GraphML, Marp, …)")
-  .option("--target <name>", "Limit export to a single target format")
-  .option(
-    "--source <kind>",
-    "For marp target: which pages to include — concepts, queries, or all (default: all)",
-  )
-  .action(async (options: { target?: string; source?: string }) => {
-    try {
-      await exportCommand(process.cwd(), options);
-    } catch (err) {
-      console.error(`\x1b[31mError:\x1b[0m ${err instanceof Error ? err.message : err}`);
-      process.exit(1);
-    }
-  });
-
-program
-  .command("serve")
-  .description("Start an MCP server exposing wiki tools and resources over stdio")
-  .option("--root <dir>", "Project root directory", process.cwd())
-  .action(async (options: { root: string }) => {
-    try {
-      // Per-tool credential checks happen inside the MCP layer so read-only
-      // tools and ingest still work without an API key.
-      await startMCPServer({ root: options.root, version });
-    } catch (err) {
-      console.error(`\x1b[31mError:\x1b[0m ${err instanceof Error ? err.message : err}`);
-      process.exit(1);
-    }
-  });
-
 /**
  * Apply the --lang CLI option by setting LLMWIKI_OUTPUT_LANG so prompt
- * builders pick it up (issue #37). Single env slot keeps the resolution
- * order simple: explicit flag wins over the inherited environment.
+ * builders pick it up. Single env slot keeps the resolution order simple:
+ * explicit flag wins over the inherited environment.
  */
 function applyLanguageOption(lang: string | undefined): void {
   if (lang && lang.trim().length > 0) {
@@ -257,9 +114,7 @@ function applyLanguageOption(lang: string | undefined): void {
 /** API key env var required per provider. Null means no key needed. */
 const PROVIDER_KEY_VARS: Record<string, string | null> = {
   anthropic: "ANTHROPIC_API_KEY",
-  openai: "OPENAI_API_KEY",
   ollama: null,
-  minimax: "MINIMAX_API_KEY",
 };
 
 /** Exit with a helpful message if the selected provider's API key is missing. */

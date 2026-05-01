@@ -13,7 +13,7 @@
  *  2. Install that tarball into a throwaway directory (no lockfile from
  *     this repo, so deps resolve fresh against the registry).
  *  3. Invoke the installed `llmwiki` binary with `--version`, `--help`,
- *     and `ingest --help`. Any crash or non-zero exit fails the test.
+ *     and `compile --help`. Any crash or non-zero exit fails the test.
  *
  * Because installing all production deps fresh is slow (~30–60s) and
  * requires registry access, the test is skipped locally by default. It
@@ -106,13 +106,12 @@ describeOrSkip("pack-and-install smoke", () => {
 
   it("--help lists the core commands", async () => {
     const { stdout } = await exec(bin, ["--help"]);
-    expect(stdout).toContain("ingest");
     expect(stdout).toContain("compile");
-    expect(stdout).toContain("query");
+    expect(stdout).toContain("review");
   });
 
-  it("ingest --help exits cleanly", async () => {
-    const { stdout } = await exec(bin, ["ingest", "--help"]);
-    expect(stdout).toContain("ingest");
+  it("compile --help exits cleanly", async () => {
+    const { stdout } = await exec(bin, ["compile", "--help"]);
+    expect(stdout).toContain("compile");
   });
 });

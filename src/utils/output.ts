@@ -14,10 +14,6 @@ const MAGENTA = "\x1b[35m";
 const CYAN = "\x1b[36m";
 const RED = "\x1b[31m";
 
-export function bold(text: string): string {
-  return `${BOLD}${text}${RESET}`;
-}
-
 export function dim(text: string): string {
   return `${DIM}${text}${RESET}`;
 }

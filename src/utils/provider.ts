@@ -3,14 +3,12 @@
  *
  * Defines the LLMProvider interface and a factory function that reads
  * LLMWIKI_PROVIDER and LLMWIKI_MODEL env vars to instantiate the
- * appropriate backend (Anthropic, OpenAI, Ollama, or MiniMax).
+ * appropriate backend (Anthropic or Ollama).
  */
 
 import { DEFAULT_PROVIDER, PROVIDER_MODELS, OLLAMA_DEFAULT_HOST } from "./constants.js";
 import { AnthropicProvider } from "../providers/anthropic.js";
-import { OpenAIProvider } from "../providers/openai.js";
 import { OllamaProvider } from "../providers/ollama.js";
-import { MiniMaxProvider } from "../providers/minimax.js";
 import {
   resolveAnthropicAuthFromEnv,
   resolveAnthropicBaseURLFromEnv,
@@ -45,11 +43,9 @@ export interface LLMProvider {
     tools: LLMTool[],
     maxTokens: number,
   ): Promise<string>;
-  /** Return a single embedding vector for the given text. */
-  embed(text: string): Promise<number[]>;
 }
 
-const SUPPORTED_PROVIDERS: ReadonlySet<string> = new Set(["anthropic", "openai", "ollama", "minimax"]);
+const SUPPORTED_PROVIDERS: ReadonlySet<string> = new Set(["anthropic", "ollama"]);
 
 /**
  * Factory that returns the appropriate LLMProvider based on env vars.
@@ -64,20 +60,10 @@ export function getProvider(): LLMProvider {
   switch (providerName) {
     case "anthropic":
       return getAnthropicProvider();
-    case "openai":
-      return new OpenAIProvider(getModelForProvider("openai"), {
-        baseURL: readOptionalEnv("OPENAI_BASE_URL"),
-        embeddingsBaseURL: readOptionalEnv("OPENAI_EMBEDDINGS_BASE_URL"),
-        embeddingModel: readOptionalEnv("LLMWIKI_EMBEDDING_MODEL"),
-      });
     case "ollama":
       return new OllamaProvider(getModelForProvider("ollama"), {
         baseURL: readOptionalEnv("OLLAMA_HOST") ?? OLLAMA_DEFAULT_HOST,
-        embeddingsBaseURL: readOptionalEnv("OLLAMA_EMBEDDINGS_HOST"),
-        embeddingModel: readOptionalEnv("LLMWIKI_EMBEDDING_MODEL"),
       });
-    case "minimax":
-      return getMiniMaxProvider();
     default:
       throw new Error(`Unhandled provider: ${providerName}`);
   }
@@ -88,19 +74,8 @@ function readOptionalEnv(name: string): string | undefined {
   return value ? value : undefined;
 }
 
-function getModelForProvider(providerName: "openai" | "ollama" | "minimax"): string {
+function getModelForProvider(providerName: "ollama"): string {
   return process.env.LLMWIKI_MODEL ?? PROVIDER_MODELS[providerName];
-}
-
-function getMiniMaxProvider(): MiniMaxProvider {
-  const apiKey = process.env.MINIMAX_API_KEY;
-  if (!apiKey) {
-    throw new Error(
-      "MiniMax provider requires MINIMAX_API_KEY environment variable.\n" +
-      '  Set it with: export MINIMAX_API_KEY=your_key',
-    );
-  }
-  return new MiniMaxProvider(getModelForProvider("minimax"), apiKey);
 }
 
 function getAnthropicProvider(): AnthropicProvider {
@@ -122,9 +97,4 @@ function getProviderName(): string {
     );
   }
   return providerName;
-}
-
-/** Expose the resolved provider name for callers that need model lookup. */
-export function getActiveProviderName(): string {
-  return getProviderName();
 }

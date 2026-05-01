@@ -197,35 +197,6 @@ export function isMalformedCitationEntry(entry: string): boolean {
   return !isValidLineRange(startLine, endLine);
 }
 
-/**
- * Inspect provenance for a page body, grouping every parsed span by source file.
- * Useful for tooling that wants to render a "this page draws from" panel without
- * worrying about how the markers were formatted in source. Each filename maps to
- * a deduplicated list of `{start, end}` line ranges (paragraph-only citations
- * appear as the empty array, signalling "no specific span").
- */
-export function inspectProvenance(body: string): Map<string, Array<{ start: number; end: number }>> {
-  const grouped = new Map<string, Array<{ start: number; end: number }>>();
-  for (const citation of extractClaimCitations(body)) {
-    for (const span of citation.spans) {
-      const ranges = grouped.get(span.file) ?? [];
-      if (span.lines && !rangeAlreadyTracked(ranges, span.lines)) {
-        ranges.push(span.lines);
-      }
-      grouped.set(span.file, ranges);
-    }
-  }
-  return grouped;
-}
-
-/** Has this start/end pair already been recorded for a file? */
-function rangeAlreadyTracked(
-  ranges: Array<{ start: number; end: number }>,
-  candidate: { start: number; end: number },
-): boolean {
-  return ranges.some((r) => r.start === candidate.start && r.end === candidate.end);
-}
-
 /** Read a file, returning empty string if it doesn't exist. */
 export async function safeReadFile(filePath: string): Promise<string> {
   try {

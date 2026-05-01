@@ -9,7 +9,7 @@
 import { readdir } from "fs/promises";
 import path from "path";
 import { atomicWrite, safeReadFile, parseFrontmatter } from "../utils/markdown.js";
-import { CONCEPTS_DIR, QUERIES_DIR, INDEX_FILE } from "../utils/constants.js";
+import { CONCEPTS_DIR, INDEX_FILE } from "../utils/constants.js";
 import * as output from "../utils/output.js";
 import type { PageSummary } from "../utils/types.js";
 
@@ -21,19 +21,14 @@ export async function generateIndex(root: string): Promise<void> {
   output.status("*", output.info("Generating index..."));
 
   const conceptsPath = path.join(root, CONCEPTS_DIR);
-  const queriesPath = path.join(root, QUERIES_DIR);
   const concepts = await collectPageSummaries(conceptsPath);
-  const queries = await collectPageSummaries(queriesPath);
-
   concepts.sort((a, b) => a.title.localeCompare(b.title));
-  queries.sort((a, b) => a.title.localeCompare(b.title));
 
-  const indexContent = buildIndexContent(concepts, queries);
+  const indexContent = buildIndexContent(concepts);
   const indexPath = path.join(root, INDEX_FILE);
   await atomicWrite(indexPath, indexContent);
 
-  const total = concepts.length + queries.length;
-  output.status("+", output.success(`Index updated with ${total} pages.`));
+  output.status("+", output.success(`Index updated with ${concepts.length} pages.`));
 }
 
 /** A scanned page paired with its parsed frontmatter. */
@@ -44,12 +39,10 @@ interface ScannedPage {
 
 /**
  * Scan a wiki directory and return every .md page paired with its parsed
- * frontmatter. Read-only utility shared by index generation and the MCP
- * server's status tool.
+ * frontmatter. Returns an empty array when the directory is missing.
  * @param dirPath - Absolute path to a wiki page directory.
- * @returns Array of {slug, meta} entries — empty when the directory is missing.
  */
-export async function scanWikiPages(dirPath: string): Promise<ScannedPage[]> {
+async function scanWikiPages(dirPath: string): Promise<ScannedPage[]> {
   let files: string[];
   try {
     files = await readdir(dirPath);
@@ -68,12 +61,10 @@ export async function scanWikiPages(dirPath: string): Promise<ScannedPage[]> {
 
 /**
  * Project a wiki directory into PageSummary entries (excludes orphaned and
- * untitled pages). Built on top of scanWikiPages so the MCP server can share
- * the underlying scan logic without re-reading the directory.
+ * untitled pages).
  * @param conceptsPath - Absolute path to wiki/concepts/.
- * @returns Array of page summary objects.
  */
-export async function collectPageSummaries(
+async function collectPageSummaries(
   conceptsPath: string,
 ): Promise<PageSummary[]> {
   const scanned = await scanWikiPages(conceptsPath);
@@ -93,26 +84,17 @@ function stripWikilinks(text: string): string {
 
 /**
  * Build the index.md markdown content from page summaries.
- * @param pages - Sorted array of page summaries.
- * @returns Full index.md content string.
+ * @param concepts - Sorted array of concept page summaries.
  */
-function buildIndexContent(concepts: PageSummary[], queries: PageSummary[]): string {
+function buildIndexContent(concepts: PageSummary[]): string {
   const lines = ["# Knowledge Wiki", "", "## Concepts", ""];
 
   for (const page of concepts) {
     lines.push(`- **[[${page.slug}|${page.title}]]** — ${stripWikilinks(page.summary)}`);
   }
 
-  if (queries.length > 0) {
-    lines.push("", "## Saved Queries", "");
-    for (const page of queries) {
-      lines.push(`- **[[${page.slug}|${page.title}]]** — ${stripWikilinks(page.summary)}`);
-    }
-  }
-
-  const total = concepts.length + queries.length;
   lines.push("");
-  lines.push(`_${total} pages | Generated ${new Date().toISOString()}_`);
+  lines.push(`_${concepts.length} pages | Generated ${new Date().toISOString()}_`);
   lines.push("");
 
   return lines.join("\n");

@@ -6,13 +6,11 @@
  */
 
 import { OpenAIProvider, readTimeoutEnv } from "./openai.js";
-import { EMBEDDING_MODELS, OLLAMA_DEFAULT_TIMEOUT_MS } from "../utils/constants.js";
+import { OLLAMA_DEFAULT_TIMEOUT_MS } from "../utils/constants.js";
 
 /** Construction options for an Ollama-compatible provider. */
 interface OllamaProviderOptions {
   baseURL: string;
-  embeddingsBaseURL?: string;
-  embeddingModel?: string;
   /**
    * Per-request timeout in milliseconds. Defaults to 30 minutes for Ollama
    * because local models on modest hardware can take much longer than the
@@ -38,14 +36,7 @@ export class OllamaProvider extends OpenAIProvider {
     super(model, {
       baseURL: options.baseURL,
       apiKey: "ollama",
-      embeddingsBaseURL: options.embeddingsBaseURL,
-      embeddingModel: options.embeddingModel,
       timeoutMs: resolveOllamaTimeoutMs(options.timeoutMs),
     });
-  }
-
-  /** Ollama ships a dedicated embedding model (nomic-embed-text). */
-  protected override embeddingModel(): string {
-    return this.configuredEmbeddingModel ?? EMBEDDING_MODELS.ollama;
   }
 }

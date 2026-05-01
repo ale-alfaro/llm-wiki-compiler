@@ -1,6 +1,7 @@
 /**
  * Tests for the provider factory (getProvider).
- * Verifies correct provider instantiation based on env vars.
+ * Verifies correct provider instantiation based on env vars for the
+ * supported providers (anthropic and ollama).
  */
 
 import { describe, it, expect, afterEach } from "vitest";
@@ -9,9 +10,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { getProvider } from "../src/utils/provider.js";
 import { AnthropicProvider } from "../src/providers/anthropic.js";
-import { OpenAIProvider } from "../src/providers/openai.js";
 import { OllamaProvider } from "../src/providers/ollama.js";
-import { MiniMaxProvider } from "../src/providers/minimax.js";
 
 const TEST_SETTINGS_PATH_ENV = "LLMWIKI_CLAUDE_SETTINGS_PATH";
 const tempDirs: string[] = [];
@@ -52,17 +51,11 @@ describe("getProvider", () => {
   afterEach(() => {
     delete process.env.LLMWIKI_PROVIDER;
     delete process.env.LLMWIKI_MODEL;
-    delete process.env.LLMWIKI_EMBEDDING_MODEL;
     delete process.env.ANTHROPIC_BASE_URL;
     delete process.env.ANTHROPIC_API_KEY;
     delete process.env.ANTHROPIC_AUTH_TOKEN;
-    delete process.env.OPENAI_API_KEY;
-    delete process.env.OPENAI_BASE_URL;
-    delete process.env.OPENAI_EMBEDDINGS_BASE_URL;
     delete process.env.OLLAMA_HOST;
-    delete process.env.OLLAMA_EMBEDDINGS_HOST;
     delete process.env[TEST_SETTINGS_PATH_ENV];
-    delete process.env.MINIMAX_API_KEY;
 
     for (const dir of tempDirs.splice(0)) {
       rmSync(dir, { recursive: true, force: true });
@@ -104,12 +97,6 @@ describe("getProvider", () => {
     expect(provider).toBeInstanceOf(AnthropicProvider);
   });
 
-  it("returns OpenAIProvider when LLMWIKI_PROVIDER=openai", () => {
-    process.env.LLMWIKI_PROVIDER = "openai";
-    const provider = getProvider();
-    expect(provider).toBeInstanceOf(OpenAIProvider);
-  });
-
   it("returns OllamaProvider when LLMWIKI_PROVIDER=ollama", () => {
     process.env.LLMWIKI_PROVIDER = "ollama";
     const provider = getProvider();
@@ -121,76 +108,12 @@ describe("getProvider", () => {
     expect(() => getProvider()).toThrow('Unknown provider "gemini"');
   });
 
-  it("returns MiniMaxProvider when LLMWIKI_PROVIDER=minimax", () => {
-    process.env.LLMWIKI_PROVIDER = "minimax";
-    process.env.MINIMAX_API_KEY = "test-key";
-    const provider = getProvider();
-    expect(provider).toBeInstanceOf(MiniMaxProvider);
-  });
-
-  it("throws when MINIMAX_API_KEY is absent for minimax provider", () => {
-    process.env.LLMWIKI_PROVIDER = "minimax";
-    delete process.env.MINIMAX_API_KEY;
-    expect(() => getProvider()).toThrow("MINIMAX_API_KEY");
-  });
-
-  it("respects LLMWIKI_MODEL override", () => {
-    process.env.LLMWIKI_PROVIDER = "openai";
-    process.env.LLMWIKI_MODEL = "gpt-4-turbo";
-    const provider = getProvider();
-    expect(provider).toBeInstanceOf(OpenAIProvider);
-    // The model is stored as a protected field; verify it was accepted
-    // by checking the provider was created without throwing
-    expect(provider).toBeDefined();
-  });
-
-  it("passes OpenAI chat and embedding base URLs separately", () => {
-    process.env.LLMWIKI_PROVIDER = "openai";
-    process.env.OPENAI_BASE_URL = "http://localhost:8080/v1";
-    process.env.OPENAI_EMBEDDINGS_BASE_URL = "http://localhost:8081/v1";
-    process.env.LLMWIKI_EMBEDDING_MODEL = "local-embed";
-
-    const provider = getProvider();
-
-    expect(provider).toBeInstanceOf(OpenAIProvider);
-    expectClientBaseURL(provider, "client", "http://localhost:8080/v1");
-    expectClientBaseURL(provider, "embeddingsClient", "http://localhost:8081/v1");
-    expect(Reflect.get(provider, "configuredEmbeddingModel")).toBe("local-embed");
-  });
-
-  it("passes Ollama chat and embedding hosts separately", () => {
+  it("uses configured Ollama host", () => {
     process.env.LLMWIKI_PROVIDER = "ollama";
     process.env.OLLAMA_HOST = "http://localhost:11434/v1";
-    process.env.OLLAMA_EMBEDDINGS_HOST = "http://localhost:11435/v1";
-    process.env.LLMWIKI_EMBEDDING_MODEL = "nomic-local";
-
     const provider = getProvider();
-
     expect(provider).toBeInstanceOf(OllamaProvider);
     expectClientBaseURL(provider, "client", "http://localhost:11434/v1");
-    expectClientBaseURL(provider, "embeddingsClient", "http://localhost:11435/v1");
-    expect(Reflect.get(provider, "configuredEmbeddingModel")).toBe("nomic-local");
-  });
-
-  it("ignores whitespace-only optional OpenAI endpoint vars", () => {
-    process.env.LLMWIKI_PROVIDER = "openai";
-    process.env.OPENAI_BASE_URL = "  ";
-    process.env.OPENAI_EMBEDDINGS_BASE_URL = "  ";
-    process.env.LLMWIKI_EMBEDDING_MODEL = "  ";
-
-    const provider = getProvider();
-
-    expect(provider).toBeInstanceOf(OpenAIProvider);
-    expect(Reflect.get(provider, "embeddingsClient")).toBe(Reflect.get(provider, "client"));
-    expect(Reflect.get(provider, "configuredEmbeddingModel")).toBeUndefined();
-  });
-
-  it("ignores anthropic base url for non-anthropic providers", () => {
-    process.env.LLMWIKI_PROVIDER = "openai";
-    process.env.ANTHROPIC_BASE_URL = "https://invalid-host.com/v1";
-    const provider = getProvider();
-    expect(provider).toBeInstanceOf(OpenAIProvider);
-    expect(provider).toBeDefined();
   });
 
   it("treats whitespace-only ANTHROPIC_BASE_URL as unset", () => {
@@ -217,17 +140,6 @@ describe("getProvider", () => {
     process.env.LLMWIKI_MODEL = "explicit-model";
     setClaudeAnthropicModelFallback("Kimi-2.5");
     expectAnthropicModel("explicit-model");
-  });
-
-  it("does not read Claude fallback for openai when explicit settings are sufficient", () => {
-    const settingsPath = withMalformedClaudeSettings("llmwiki-provider-factory-bad-json-");
-
-    process.env.LLMWIKI_PROVIDER = "openai";
-    process.env.LLMWIKI_MODEL = "gpt-4o-mini";
-    process.env[TEST_SETTINGS_PATH_ENV] = settingsPath;
-
-    const provider = getProvider();
-    expect(provider).toBeInstanceOf(OpenAIProvider);
   });
 
   it("throws when Claude settings JSON is malformed and anthropic fallback is required", () => {
