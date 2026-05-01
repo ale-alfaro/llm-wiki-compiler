@@ -1,0 +1,82 @@
+#:schema https://mise.jdx.dev/schema/mise.json
+
+# Pin runtime tools so anyone with mise installed gets the same Node version
+# the project was built against — no manual nvm/asdf juggling required.
+[tools]
+node = "24"
+
+# Task surface. Run any of these with: `mise run <name>`.
+# Positional args go after `--`, e.g. `mise run review:show -- abc123`.
+
+[tasks.setup]
+description = "Install npm dependencies (run once after cloning, or after package.json changes)"
+run = "npm install"
+
+# ---------- Dev gate ----------
+
+[tasks.typecheck]
+description = "Run the TypeScript type checker without emitting"
+run = "npx tsc --noEmit"
+
+[tasks.build]
+description = "Bundle the CLI into dist/cli.js"
+run = "npm run build"
+
+[tasks.test]
+description = "Run the full test suite once"
+run = "npm test"
+
+[tasks."test:watch"]
+description = "Re-run tests on file changes"
+run = "npm run test:watch"
+
+[tasks.fallow]
+description = "Run the fallow code-health analyzer"
+run = "npx fallow"
+
+[tasks."fallow:fix"]
+description = "Apply fallow auto-fixes (deletes dead exports, etc.)"
+run = "npx fallow fix --yes"
+
+[tasks.check]
+description = "Pre-commit gate: typecheck, build, test, fallow (sequential)"
+run = [
+  "npx tsc --noEmit",
+  "npm run build",
+  "npm test",
+  "npx fallow",
+]
+
+# ---------- End-user compile + review workflow ----------
+# These all `depends = ["build"]` so the dist bundle is fresh before the CLI
+# runs. If you'd rather skip the rebuild, invoke `node dist/cli.js …` directly.
+
+[tasks.compile]
+description = "Compile sources/ into wiki/ (writes pages directly)"
+depends = ["build"]
+run = "node dist/cli.js compile"
+
+[tasks."compile:review"]
+description = "Compile in review mode — write candidates to .llmwiki/candidates/ instead of wiki/"
+depends = ["build"]
+run = "node dist/cli.js compile --review"
+
+[tasks."review:list"]
+description = "List pending review candidates"
+depends = ["build"]
+run = "node dist/cli.js review list"
+
+[tasks."review:show"]
+description = "Print a single candidate (usage: mise run review:show -- <id>)"
+depends = ["build"]
+run = 'node dist/cli.js review show "$@"'
+
+[tasks."review:approve"]
+description = "Promote a candidate into wiki/ (usage: mise run review:approve -- <id>)"
+depends = ["build"]
+run = 'node dist/cli.js review approve "$@"'
+
+[tasks."review:reject"]
+description = "Archive a candidate without touching wiki/ (usage: mise run review:reject -- <id>)"
+depends = ["build"]
+run = 'node dist/cli.js review reject "$@"'
