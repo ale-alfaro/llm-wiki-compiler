@@ -134,8 +134,3 @@ export async function loadSchema(root: string): Promise<SchemaConfig> {
   const parsed = parseSchemaFile(schemaPath, raw);
   return applyOverrides(defaults, parsed, schemaPath);
 }
-
-/** Expose candidate paths so the CLI `schema init` command can pick one. */
-export function defaultSchemaInitPath(root: string): string {
-  return path.join(root, SCHEMA_CANDIDATE_PATHS[0]);
-}

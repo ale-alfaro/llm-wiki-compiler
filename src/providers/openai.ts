@@ -1,25 +1,27 @@
 /**
- * OpenAI LLM provider implementation.
+ * OpenAI-compatible LLM provider implementation.
  *
  * Wraps the openai npm package to implement the LLMProvider interface.
- * Translates Anthropic-style tool schemas (input_schema) to OpenAI format (parameters).
+ * Used directly via OPENAI_BASE_URL or extended by Ollama (which exposes an
+ * OpenAI-compatible endpoint).
+ *
+ * Translates Anthropic-style tool schemas (input_schema) to OpenAI format
+ * (parameters).
  */
 
 import OpenAI from "openai";
 import type { LLMProvider, LLMMessage, LLMTool } from "../utils/provider.js";
-import { EMBEDDING_MODELS, OPENAI_DEFAULT_TIMEOUT_MS } from "../utils/constants.js";
+import { OPENAI_DEFAULT_TIMEOUT_MS } from "../utils/constants.js";
 
 /** Construction options for an OpenAI-compatible provider. */
 interface OpenAIProviderOptions {
   baseURL?: string;
   apiKey?: string;
-  embeddingsBaseURL?: string;
-  embeddingModel?: string;
   /**
-   * Per-request timeout in milliseconds. Defaults to 10 minutes for cloud
-   * OpenAI (matches the SDK default). Long compile-time completions on
-   * slower local models can exceed this — see {@link OllamaProvider} which
-   * raises the default and reads LLMWIKI_REQUEST_TIMEOUT_MS / OLLAMA_TIMEOUT_MS.
+   * Per-request timeout in milliseconds. Defaults to 10 minutes (matches the
+   * SDK default). Long compile-time completions on slower local models can
+   * exceed this — see {@link OllamaProvider} which raises the default and
+   * reads LLMWIKI_REQUEST_TIMEOUT_MS / OLLAMA_TIMEOUT_MS.
    */
   timeoutMs?: number;
 }
@@ -43,7 +45,7 @@ function resolveOpenAITimeoutMs(): number | undefined {
 }
 
 /** Translate an Anthropic-style LLMTool to an OpenAI ChatCompletionTool. */
-export function translateToolToOpenAI(
+function translateToolToOpenAI(
   tool: LLMTool,
 ): OpenAI.ChatCompletionTool {
   return {
@@ -56,16 +58,13 @@ export function translateToolToOpenAI(
   };
 }
 
-/** OpenAI-backed LLM provider. */
+/** OpenAI-compatible LLM provider. */
 export class OpenAIProvider implements LLMProvider {
   protected readonly client: OpenAI;
-  protected readonly embeddingsClient: OpenAI;
   protected readonly model: string;
-  protected readonly configuredEmbeddingModel?: string;
 
   constructor(model: string, options: OpenAIProviderOptions = {}) {
     this.model = model;
-    this.configuredEmbeddingModel = options.embeddingModel;
     // The OpenAI SDK validates OPENAI_API_KEY at construction time.
     // Pass the key explicitly so the provider controls when validation happens.
     const resolvedKey = options.apiKey ?? process.env.OPENAI_API_KEY ?? "";
@@ -75,9 +74,6 @@ export class OpenAIProvider implements LLMProvider {
       baseURL: options.baseURL ?? null,
       timeout,
     });
-    this.embeddingsClient = options.embeddingsBaseURL
-      ? new OpenAI({ apiKey: resolvedKey, baseURL: options.embeddingsBaseURL, timeout })
-      : this.client;
   }
 
   /** Send a single non-streaming completion request. */
@@ -139,27 +135,5 @@ export class OpenAIProvider implements LLMProvider {
     }
 
     return response.choices[0]?.message?.content ?? "";
-  }
-
-  /**
-   * Produce a single embedding vector via the OpenAI embeddings API.
-   * Subclasses (e.g. Ollama) override embeddingModel() to pick a different model.
-   */
-  async embed(text: string): Promise<number[]> {
-    const response = await this.embeddingsClient.embeddings.create({
-      model: this.embeddingModel(),
-      input: text,
-    });
-
-    const vector = response.data[0]?.embedding;
-    if (!Array.isArray(vector)) {
-      throw new Error("OpenAI embeddings response did not include a vector.");
-    }
-    return vector;
-  }
-
-  /** Default embedding model for this provider. Subclasses may override. */
-  protected embeddingModel(): string {
-    return this.configuredEmbeddingModel ?? EMBEDDING_MODELS.openai;
   }
 }

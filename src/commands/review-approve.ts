@@ -2,9 +2,9 @@
  * Commander action for `llmwiki review approve <id>`.
  *
  * Promotes a pending candidate into the live wiki: writes the page body to
- * wiki/concepts/<slug>.md, refreshes the index/MOC, updates embeddings, and
- * removes the candidate file. Approval never re-invokes the LLM — the body
- * stored in the candidate is written verbatim.
+ * wiki/concepts/<slug>.md, refreshes the index/MOC, and removes the candidate
+ * file. Approval never re-invokes the LLM — the body stored in the candidate
+ * is written verbatim.
  *
  * All mutations are performed under `.llmwiki/lock` to prevent races with a
  * concurrent compile or sibling approve/reject. The candidate is re-read under
@@ -25,7 +25,6 @@ import {
 import { generateIndex } from "../compiler/indexgen.js";
 import { generateMOC } from "../compiler/obsidian.js";
 import { resolveLinks } from "../compiler/resolver.js";
-import { updateEmbeddings } from "../utils/embeddings.js";
 import { updateSourceState } from "../utils/state.js";
 import { CONCEPTS_DIR } from "../utils/constants.js";
 import * as output from "../utils/output.js";
@@ -109,24 +108,9 @@ async function collectOtherCandidateSources(
   return sources;
 }
 
-/** Refresh interlinks, index, MOC, and embeddings after writing a candidate. */
+/** Refresh interlinks, index, and MOC after writing a candidate. */
 async function refreshWikiAfterApproval(root: string, slug: string): Promise<void> {
   await resolveLinks(root, [slug], [slug]);
   await generateIndex(root);
   await generateMOC(root);
-  await safelyUpdateEmbeddings(root, [slug]);
-}
-
-/**
- * Refresh the embeddings store without failing approval.
- * Mirrors the compiler's tolerance: missing API keys / transient provider
- * failures should warn, not abort the approval flow.
- */
-async function safelyUpdateEmbeddings(root: string, slugs: string[]): Promise<void> {
-  try {
-    await updateEmbeddings(root, slugs);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    output.status("!", output.warn(`Skipped embeddings update: ${message}`));
-  }
 }

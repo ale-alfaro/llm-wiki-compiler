@@ -46,7 +46,6 @@ import { resolveLinks } from "./resolver.js";
 import { generateIndex } from "./indexgen.js";
 import { buildBudgetedCombinedContent, type SourceSlice } from "./prompt-budget.js";
 import { addObsidianMeta, generateMOC } from "./obsidian.js";
-import { updateEmbeddings } from "../utils/embeddings.js";
 import { writeCandidate } from "./candidates.js";
 import {
   checkPageBrokenCitations,
@@ -364,7 +363,6 @@ async function finalizeWiki(root: string, pages: MergedConcept[]): Promise<void>
 
   await generateIndex(root);
   await generateMOC(root);
-  await safelyUpdateEmbeddings(root, allChangedSlugs);
 }
 
 /** Print a summary of detected source file changes. */
@@ -424,7 +422,7 @@ interface MergedConcept {
  * - contradictedBy: union by slug (deduplicating on slug identity)
  * - inferredParagraphs: max (any source claiming inference wins)
  */
-export function reconcileConceptMetadata(
+function reconcileConceptMetadata(
   existing: ExtractedConcept,
   incoming: ExtractedConcept,
 ): ExtractedConcept {
@@ -712,20 +710,6 @@ async function writePageIfValid(
 
   await atomicWrite(pagePath, content);
   return null;
-}
-
-/**
- * Refresh the embeddings store without failing compilation.
- * Semantic search is a non-critical enhancement — missing API keys or
- * transient provider errors should produce a warning, not a broken build.
- */
-async function safelyUpdateEmbeddings(root: string, changedSlugs: string[]): Promise<void> {
-  try {
-    await updateEmbeddings(root, changedSlugs);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    output.status("!", output.warn(`Skipped embeddings update: ${message}`));
-  }
 }
 
 /**

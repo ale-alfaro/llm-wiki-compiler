@@ -47,9 +47,8 @@ describe("CLI smoke tests", () => {
   it("prints help and exits 0", async () => {
     const { stdout } = await exec("node", [CLI, "--help"]);
     expect(stdout).toContain("llmwiki");
-    expect(stdout).toContain("ingest");
     expect(stdout).toContain("compile");
-    expect(stdout).toContain("query");
+    expect(stdout).toContain("review");
   }, 30_000);
 
   it("prints version", async () => {
@@ -132,20 +131,4 @@ describe("CLI smoke tests", () => {
     }
   }, 30_000);
 
-  it("ingest shows next-step hint", async () => {
-    const cwd = path.join(tmpdir(), `llmwiki-test-ingest-${Date.now()}`);
-    await mkdir(cwd, { recursive: true });
-    const fixture = path.resolve("test/fixtures/sample-source.md");
-    try {
-      const { stdout } = await exec("node", [CLI, "ingest", fixture], { cwd });
-      expect(stdout).toContain("Next: llmwiki compile");
-    } finally {
-      await cleanupDirectory(cwd);
-    }
-  }, 30_000);
-
-  it("compile without sources does not show query hint", async () => {
-    const stdout = await runCompileWithoutSources("compile", { ANTHROPIC_API_KEY: "dummy" });
-    expect(stdout).not.toContain("Next: llmwiki query");
-  }, 30_000);
 });
