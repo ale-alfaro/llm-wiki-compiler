@@ -14,8 +14,8 @@ import { readdir, readFile } from "fs/promises";
 import path from "path";
 import { existsSync } from "fs";
 import { atomicWrite, parseFrontmatter } from "../utils/markdown.js";
-import { CONCEPTS_DIR } from "../utils/constants.js";
 import * as output from "../utils/output.js";
+import type { CompilePaths } from "../utils/types.js";
 
 interface PageInfo {
   slug: string;
@@ -24,8 +24,7 @@ interface PageInfo {
 }
 
 /** Build an index of all wiki page titles from the concepts directory. */
-async function buildTitleIndex(root: string): Promise<PageInfo[]> {
-  const conceptsDir = path.join(root, CONCEPTS_DIR);
+async function buildTitleIndex(conceptsDir: string): Promise<PageInfo[]> {
   if (!existsSync(conceptsDir)) return [];
 
   const files = await readdir(conceptsDir);
@@ -132,11 +131,11 @@ function addWikilinks(body: string, titles: PageInfo[], selfTitle: string): stri
  * Complexity: O(changed * total) for outbound, O(newTitles * total) for inbound.
  */
 export async function resolveLinks(
-  root: string,
+  paths: CompilePaths,
   changedSlugs: string[],
   newSlugs: string[],
 ): Promise<number> {
-  const titleIndex = await buildTitleIndex(root);
+  const titleIndex = await buildTitleIndex(paths.conceptsDir);
   if (titleIndex.length === 0) return 0;
 
   let linkCount = 0;

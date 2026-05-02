@@ -11,7 +11,7 @@
 import { readdir } from "fs/promises";
 import path from "path";
 import { slugify, atomicWrite, safeReadFile, parseFrontmatter } from "../utils/markdown.js";
-import { CONCEPTS_DIR, MOC_FILE } from "../utils/constants.js";
+import type { CompilePaths } from "../utils/types.js";
 
 /** Minimum word count to generate an abbreviation alias. */
 const ABBREVIATION_MIN_WORDS = 3;
@@ -104,16 +104,15 @@ function generateAbbreviation(title: string): string | null {
  * Generate a Map of Content (MOC) page grouping concept pages by tag.
  * Reads all concept pages, extracts their tags from frontmatter, and writes
  * a structured MOC.md with sections per tag and an Uncategorized section.
- * @param root - Project root directory.
+ * @param paths - Resolved compile paths providing the concepts dir and MOC file.
  */
-export async function generateMOC(root: string): Promise<void> {
-  const conceptsPath = path.join(root, CONCEPTS_DIR);
-  const pages = await loadConceptPages(conceptsPath);
+export async function generateMOC(paths: CompilePaths): Promise<void> {
+  const pages = await loadConceptPages(paths.conceptsDir);
 
   const tagGroups = groupPagesByTag(pages);
   const content = buildMOCContent(tagGroups);
 
-  await atomicWrite(path.join(root, MOC_FILE), content);
+  await atomicWrite(paths.mocFile, content);
 }
 
 /** Minimal page info needed for MOC generation. */

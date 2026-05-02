@@ -20,7 +20,7 @@ import { runReviewUnderLock, readCandidateUnderLock } from "./review-helpers.js"
 
 /** Reject a pending candidate by archiving its JSON record. */
 export default async function reviewRejectCommand(id: string): Promise<void> {
-  await runReviewUnderLock(id, rejectUnderLock);
+  await runReviewUnderLock(process.cwd(), id, rejectUnderLock);
 }
 
 /**

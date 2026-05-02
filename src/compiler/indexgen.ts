@@ -9,24 +9,21 @@
 import { readdir } from "fs/promises";
 import path from "path";
 import { atomicWrite, safeReadFile, parseFrontmatter } from "../utils/markdown.js";
-import { CONCEPTS_DIR, INDEX_FILE } from "../utils/constants.js";
 import * as output from "../utils/output.js";
-import type { PageSummary } from "../utils/types.js";
+import type { CompilePaths, PageSummary } from "../utils/types.js";
 
 /**
  * Generate the wiki/index.md listing all concept pages with summaries.
- * @param root - Project root directory.
+ * @param paths - Resolved compile paths providing the concepts dir and index file.
  */
-export async function generateIndex(root: string): Promise<void> {
+export async function generateIndex(paths: CompilePaths): Promise<void> {
   output.status("*", output.info("Generating index..."));
 
-  const conceptsPath = path.join(root, CONCEPTS_DIR);
-  const concepts = await collectPageSummaries(conceptsPath);
+  const concepts = await collectPageSummaries(paths.conceptsDir);
   concepts.sort((a, b) => a.title.localeCompare(b.title));
 
   const indexContent = buildIndexContent(concepts);
-  const indexPath = path.join(root, INDEX_FILE);
-  await atomicWrite(indexPath, indexContent);
+  await atomicWrite(paths.indexFile, indexContent);
 
   output.status("+", output.success(`Index updated with ${concepts.length} pages.`));
 }

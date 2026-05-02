@@ -2,7 +2,7 @@
  * Commander action for `llmwiki review approve <id>`.
  *
  * Promotes a pending candidate into the live wiki: writes the page body to
- * wiki/concepts/<slug>.md, refreshes the index/MOC, and removes the candidate
+ * <conceptsDir>/<slug>.md, refreshes the index/MOC, and removes the candidate
  * file. Approval never re-invokes the LLM — the body stored in the candidate
  * is written verbatim.
  *
@@ -11,13 +11,17 @@
  * the lock (TOCTOU guard) — if it disappears between the fast-fail check and
  * lock acquisition (e.g. a concurrent reject ran first), the approval aborts
  * cleanly rather than writing a page from a stale in-memory snapshot.
+ *
+ * Output paths follow the same `--vault`/`--output` resolution as `compile`,
+ * so an approval that runs in a different shell with different overrides
+ * still writes into the right `wiki/` directory.
  */
 
-import path from "path";
 import {
   atomicWrite,
   validateWikiPage,
 } from "../utils/markdown.js";
+import path from "path";
 import {
   deleteCandidate,
   listCandidates,
@@ -26,14 +30,26 @@ import { generateIndex } from "../compiler/indexgen.js";
 import { generateMOC } from "../compiler/obsidian.js";
 import { resolveLinks } from "../compiler/resolver.js";
 import { updateSourceState } from "../utils/state.js";
-import { CONCEPTS_DIR } from "../utils/constants.js";
+import { resolveCompilePaths } from "../utils/paths.js";
 import * as output from "../utils/output.js";
-import type { ReviewCandidate } from "../utils/types.js";
+import type { CompileOptions, CompilePaths, ReviewCandidate } from "../utils/types.js";
 import { runReviewUnderLock, readCandidateUnderLock } from "./review-helpers.js";
 
-/** Approve a pending candidate by promoting its body into wiki/concepts/. */
-export default async function reviewApproveCommand(id: string): Promise<void> {
-  await runReviewUnderLock(id, approveUnderLock);
+/**
+ * Approve a pending candidate by promoting its body into the configured
+ * concepts directory.
+ *
+ * @param id - Candidate id to approve.
+ * @param options - Vault/output overrides matching the compile flags.
+ */
+export default async function reviewApproveCommand(
+  id: string,
+  options: CompileOptions = {},
+): Promise<void> {
+  const paths = resolveCompilePaths(process.cwd(), options);
+  await runReviewUnderLock(paths.root, id, async (root, candidateId) => {
+    await approveUnderLock(paths, candidateId);
+  });
 }
 
 /**
@@ -43,8 +59,8 @@ export default async function reviewApproveCommand(id: string): Promise<void> {
  * between the pre-lock fast-fail and lock acquisition is detected. Aborts with
  * exit code 1 if the candidate has disappeared or fails page validation.
  */
-async function approveUnderLock(root: string, id: string): Promise<void> {
-  const candidate = await readCandidateUnderLock(root, id);
+async function approveUnderLock(paths: CompilePaths, id: string): Promise<void> {
+  const candidate = await readCandidateUnderLock(paths.root, id);
   if (!candidate) return;
 
   if (!validateWikiPage(candidate.body)) {
@@ -53,13 +69,13 @@ async function approveUnderLock(root: string, id: string): Promise<void> {
     return;
   }
 
-  const pagePath = path.join(root, CONCEPTS_DIR, `${candidate.slug}.md`);
+  const pagePath = path.join(paths.conceptsDir, `${candidate.slug}.md`);
   await atomicWrite(pagePath, candidate.body);
   output.status("+", output.success(`Approved → ${output.source(pagePath)}`));
 
-  await persistCandidateSourceStates(root, candidate);
-  await refreshWikiAfterApproval(root, candidate.slug);
-  await deleteCandidate(root, id);
+  await persistCandidateSourceStates(paths.root, candidate);
+  await refreshWikiAfterApproval(paths, candidate.slug);
+  await deleteCandidate(paths.root, id);
   output.status("✓", output.dim(`Candidate ${id} cleared.`));
 }
 
@@ -109,8 +125,8 @@ async function collectOtherCandidateSources(
 }
 
 /** Refresh interlinks, index, and MOC after writing a candidate. */
-async function refreshWikiAfterApproval(root: string, slug: string): Promise<void> {
-  await resolveLinks(root, [slug], [slug]);
-  await generateIndex(root);
-  await generateMOC(root);
+async function refreshWikiAfterApproval(paths: CompilePaths, slug: string): Promise<void> {
+  await resolveLinks(paths, [slug], [slug]);
+  await generateIndex(paths);
+  await generateMOC(paths);
 }

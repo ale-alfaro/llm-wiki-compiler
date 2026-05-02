@@ -17,9 +17,8 @@
 import path from "path";
 import { hashFile } from "./hasher.js";
 import { slugify } from "../utils/markdown.js";
-import { SOURCES_DIR } from "../utils/constants.js";
 import type { ExtractionResult } from "./deps.js";
-import type { SourceState } from "../utils/types.js";
+import type { CompilePaths, SourceState } from "../utils/types.js";
 
 /**
  * Compute a per-source state snapshot keyed by source filename.
@@ -35,7 +34,7 @@ import type { SourceState } from "../utils/types.js";
  * @returns Map of source filename → SourceState ready for state.json.
  */
 export async function buildExtractionSourceStates(
-  root: string,
+  paths: CompilePaths,
   extractions: ExtractionResult[],
 ): Promise<Record<string, SourceState>> {
   const snapshot: Record<string, SourceState> = {};
@@ -43,7 +42,7 @@ export async function buildExtractionSourceStates(
 
   for (const result of extractions) {
     if (result.concepts.length === 0) continue;
-    snapshot[result.sourceFile] = await buildEntry(root, result, compiledAt);
+    snapshot[result.sourceFile] = await buildEntry(paths, result, compiledAt);
   }
 
   return snapshot;
@@ -51,11 +50,11 @@ export async function buildExtractionSourceStates(
 
 /** Build a single SourceState entry for one extraction result. */
 async function buildEntry(
-  root: string,
+  paths: CompilePaths,
   result: ExtractionResult,
   compiledAt: string,
 ): Promise<SourceState> {
-  const filePath = path.join(root, SOURCES_DIR, result.sourceFile);
+  const filePath = path.join(paths.vault, result.sourceFile);
   const hash = await hashFile(filePath);
   return {
     hash,

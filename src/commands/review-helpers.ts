@@ -8,9 +8,6 @@
  *      was removed between steps 1 and 2 (e.g. a concurrent reject ran first).
  *   4. Run the mutation.
  *   5. Release lock.
- *
- * Extracting this pattern avoids duplicating the acquire/release boilerplate
- * in both approve and reject.
  */
 
 import {
@@ -29,15 +26,15 @@ export { loadCandidateUnderLockOrFail as readCandidateUnderLock };
  * Performs the pre-lock fast-fail, acquires the lock, then delegates to the
  * provided `underLock` callback. The lock is released in a `finally` block.
  *
+ * @param root - Project root anchoring `.llmwiki/`.
  * @param id - Candidate id to review.
  * @param underLock - Async mutation to run while holding the lock.
  */
 export async function runReviewUnderLock(
+  root: string,
   id: string,
   underLock: (root: string, id: string) => Promise<void>,
 ): Promise<void> {
-  const root = process.cwd();
-
   // Fast-fail: surface a clear error for obviously missing ids.
   // The authoritative check happens under the lock via loadCandidateUnderLockOrFail.
   const preCheck = await loadCandidateOrFail(root, id);

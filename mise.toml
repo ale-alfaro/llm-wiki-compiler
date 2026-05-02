@@ -52,14 +52,34 @@ run = [
 # runs. If you'd rather skip the rebuild, invoke `node dist/cli.js …` directly.
 
 [tasks.compile]
-description = "Compile sources/ into wiki/ (writes pages directly)"
+description = "Compile sources/ into wiki/ (writes pages directly). Pass extra flags after --, e.g. mise run compile -- --vault /path/to/vault"
 depends = ["build"]
-run = "node dist/cli.js compile"
+run = 'node dist/cli.js compile "$@"'
 
 [tasks."compile:review"]
 description = "Compile in review mode — write candidates to .llmwiki/candidates/ instead of wiki/"
 depends = ["build"]
-run = "node dist/cli.js compile --review"
+run = 'node dist/cli.js compile --review "$@"'
+
+# ---------- Example vault smoke runs ----------
+# Quick way to drive the compiler against the bundled examples/obsidian-vault
+# fixture. Honors --include scoping so you can verify the pipeline on a single
+# folder before running the full vault (which is ~149 notes).
+
+[tasks."compile:vault"]
+description = "Compile examples/obsidian-vault into wiki/ for an end-to-end smoke run"
+depends = ["build"]
+run = 'node dist/cli.js compile --vault examples/obsidian-vault "$@"'
+
+[tasks."compile:vault:zephyr-kernel"]
+description = "Compile only Zephyr/Kernel/** from the example vault (cheap smoke test)"
+depends = ["build"]
+run = 'node dist/cli.js compile --vault examples/obsidian-vault --include "Zephyr/Kernel/**"'
+
+[tasks."compile:vault:review"]
+description = "Compile the example vault in review mode (writes candidates, leaves wiki/ untouched)"
+depends = ["build"]
+run = 'node dist/cli.js compile --vault examples/obsidian-vault --review "$@"'
 
 [tasks."review:list"]
 description = "List pending review candidates"

@@ -3,10 +3,15 @@ import { mkdtemp, writeFile, mkdir, rm } from "fs/promises";
 import path from "path";
 import os from "os";
 import { detectChanges, hashFile } from "../src/compiler/hasher.js";
+import { resolveCompilePaths } from "../src/utils/paths.js";
 import type { WikiState } from "../src/utils/types.js";
 
 function emptyState(): WikiState {
   return { version: 1, indexHash: "", sources: {} };
+}
+
+function pathsFor(root: string): ReturnType<typeof resolveCompilePaths> {
+  return resolveCompilePaths(root);
 }
 
 describe("hashFile", () => {
@@ -52,7 +57,7 @@ describe("detectChanges", () => {
 
   it("detects new files", async () => {
     await writeFile(path.join(tmpDir, "sources", "new.md"), "new content", "utf-8");
-    const changes = await detectChanges(tmpDir, emptyState());
+    const changes = await detectChanges(pathsFor(tmpDir), emptyState());
     expect(changes).toEqual([{ file: "new.md", status: "new" }]);
   });
 
@@ -67,7 +72,7 @@ describe("detectChanges", () => {
       compiledAt: "2026-01-01T00:00:00.000Z",
     };
 
-    const changes = await detectChanges(tmpDir, state);
+    const changes = await detectChanges(pathsFor(tmpDir), state);
     expect(changes).toEqual([{ file: "existing.md", status: "changed" }]);
   });
 
@@ -83,7 +88,7 @@ describe("detectChanges", () => {
       compiledAt: "2026-01-01T00:00:00.000Z",
     };
 
-    const changes = await detectChanges(tmpDir, state);
+    const changes = await detectChanges(pathsFor(tmpDir), state);
     expect(changes).toEqual([{ file: "same.md", status: "unchanged" }]);
   });
 
@@ -95,12 +100,12 @@ describe("detectChanges", () => {
       compiledAt: "2026-01-01T00:00:00.000Z",
     };
 
-    const changes = await detectChanges(tmpDir, state);
+    const changes = await detectChanges(pathsFor(tmpDir), state);
     expect(changes).toEqual([{ file: "gone.md", status: "deleted" }]);
   });
 
   it("returns empty array for empty sources directory", async () => {
-    const changes = await detectChanges(tmpDir, emptyState());
+    const changes = await detectChanges(pathsFor(tmpDir), emptyState());
     expect(changes).toEqual([]);
   });
 });
