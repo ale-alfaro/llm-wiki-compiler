@@ -4,8 +4,6 @@ Compile raw sources into an interlinked markdown wiki.
 
 Inspired by Karpathy's [LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) pattern: instead of re-discovering knowledge at query time, compile it once into a persistent, browsable artifact that compounds over time.
 
-![llmwiki demo](docs/images/demo.gif)
-
 ## Who this is for
 
 - **AI researchers and engineers** building persistent knowledge from papers, docs, and notes

@@ -19,9 +19,8 @@ import { callClaude } from "../utils/llm.js";
 import { buildPagePrompt } from "./prompts.js";
 import { addObsidianMeta } from "./obsidian.js";
 import { addProvenanceMeta, reportContradictionWarnings } from "./provenance.js";
-import { CONCEPTS_DIR } from "../utils/constants.js";
 import type { SchemaConfig } from "../schema/index.js";
-import type { ExtractedConcept } from "../utils/types.js";
+import type { CompilePaths, ExtractedConcept } from "../utils/types.js";
 
 /** Maximum number of existing concept pages to include as cross-reference context. */
 const RELATED_PAGE_CONTEXT_LIMIT = 5;
@@ -43,13 +42,13 @@ interface RenderableConcept {
  * @returns Full markdown content (frontmatter + body, trailing newline).
  */
 export async function renderMergedPageContent(
-  root: string,
+  paths: CompilePaths,
   entry: RenderableConcept,
   schema: SchemaConfig,
 ): Promise<string> {
-  const pagePath = path.join(root, CONCEPTS_DIR, `${entry.slug}.md`);
+  const pagePath = path.join(paths.conceptsDir, `${entry.slug}.md`);
   const existingPage = await safeReadFile(pagePath);
-  const relatedPages = await loadRelatedPages(root, entry.slug);
+  const relatedPages = await loadRelatedPages(paths.conceptsDir, entry.slug);
 
   const system = buildPagePrompt(
     entry.concept.concept,
@@ -100,16 +99,15 @@ function buildMergedFrontmatter(
 /**
  * Load related wiki pages to provide cross-referencing context.
  * Returns concatenated content of up to RELATED_PAGE_CONTEXT_LIMIT pages.
- * @param root - Project root directory.
+ * @param conceptsDir - Absolute path to the concepts directory.
  * @param excludeSlug - Slug of the current page to exclude.
  * @returns Concatenated related page contents (empty when concepts dir is missing).
  */
-async function loadRelatedPages(root: string, excludeSlug: string): Promise<string> {
-  const conceptsPath = path.join(root, CONCEPTS_DIR);
+async function loadRelatedPages(conceptsDir: string, excludeSlug: string): Promise<string> {
   let files: string[];
 
   try {
-    files = await readdir(conceptsPath);
+    files = await readdir(conceptsDir);
   } catch {
     return "";
   }
@@ -120,7 +118,7 @@ async function loadRelatedPages(root: string, excludeSlug: string): Promise<stri
 
   const contents: string[] = [];
   for (const f of related) {
-    const content = await safeReadFile(path.join(conceptsPath, f));
+    const content = await safeReadFile(path.join(conceptsDir, f));
     if (!content) continue;
     const { meta } = parseFrontmatter(content);
     if (meta.orphaned) continue;

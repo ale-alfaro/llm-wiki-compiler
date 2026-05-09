@@ -19,7 +19,7 @@ import {
 } from "../utils/markdown.js";
 import { findSharedConcepts } from "./deps.js";
 import * as output from "../utils/output.js";
-import { CONCEPTS_DIR } from "../utils/constants.js";
+import type { CompilePaths } from "../utils/types.js";
 
 /**
  * Mark wiki pages as orphaned when their source is deleted.
@@ -28,7 +28,7 @@ import { CONCEPTS_DIR } from "../utils/constants.js";
  * as-is to avoid losing combined content from prior compilations.
  */
 export async function markOrphaned(
-  root: string,
+  paths: CompilePaths,
   sourceFile: string,
   state: Awaited<ReturnType<typeof readState>>,
 ): Promise<void> {
@@ -43,10 +43,10 @@ export async function markOrphaned(
       continue;
     }
 
-    await orphanPage(root, slug, "source deleted");
+    await orphanPage(paths, slug, "source deleted");
   }
 
-  await removeSourceState(root, sourceFile);
+  await removeSourceState(paths.root, sourceFile);
 }
 
 /**
@@ -55,10 +55,10 @@ export async function markOrphaned(
  * linger as an untracked stale file.
  */
 export async function orphanUnownedFrozenPages(
-  root: string,
+  paths: CompilePaths,
   frozenSlugs: Set<string>,
 ): Promise<void> {
-  const currentState = await readState(root);
+  const currentState = await readState(paths.root);
   const ownedSlugs = new Set<string>();
   for (const entry of Object.values(currentState.sources)) {
     for (const slug of entry.concepts) ownedSlugs.add(slug);
@@ -66,18 +66,18 @@ export async function orphanUnownedFrozenPages(
 
   for (const slug of frozenSlugs) {
     if (ownedSlugs.has(slug)) continue;
-    await orphanPage(root, slug, "no remaining sources");
+    await orphanPage(paths, slug, "no remaining sources");
   }
 }
 
 /**
  * Mark a single concept page as orphaned if it exists and isn't already marked.
- * @param root - Project root directory.
+ * @param paths - Resolved compile paths providing the concepts directory.
  * @param slug - Concept slug to orphan.
  * @param reason - Human-readable reason for the log message.
  */
-async function orphanPage(root: string, slug: string, reason: string): Promise<void> {
-  const pagePath = path.join(root, CONCEPTS_DIR, `${slug}.md`);
+async function orphanPage(paths: CompilePaths, slug: string, reason: string): Promise<void> {
+  const pagePath = path.join(paths.conceptsDir, `${slug}.md`);
   const content = await safeReadFile(pagePath);
   if (!content) return;
 

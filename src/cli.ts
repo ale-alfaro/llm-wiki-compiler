@@ -15,6 +15,7 @@ import reviewApproveCommand from "./commands/review-approve.js";
 import reviewRejectCommand from "./commands/review-reject.js";
 import { DEFAULT_PROVIDER } from "./utils/constants.js";
 import { resolveAnthropicAuthFromEnv } from "./utils/claude-settings.js";
+import type { CompileOptions } from "./utils/types.js";
 
 const require = createRequire(import.meta.url);
 const { version } = require("../package.json") as { version: string };
@@ -28,7 +29,19 @@ program
 
 program
   .command("compile")
-  .description("Compile sources/ into an interlinked wiki")
+  .description("Compile a vault of markdown notes into an interlinked wiki")
+  .option(
+    "--vault <path>",
+    "Vault directory to read source markdown from. Defaults to ./sources or LLMWIKI_VAULT_DIR.",
+  )
+  .option(
+    "--output <path>",
+    "Output directory for compiled wiki/ artifacts. Defaults to ./wiki or LLMWIKI_OUTPUT_DIR.",
+  )
+  .option(
+    "--include <glob>",
+    "Vault-relative glob (e.g. 'Zephyr/**') scoping which notes to compile. Defaults to LLMWIKI_INCLUDE.",
+  )
   .option(
     "--review",
     "Write generated pages as review candidates under .llmwiki/candidates/ instead of mutating wiki/. Orphan-marking for deleted sources is deferred until the next non-review compile.",
@@ -37,16 +50,24 @@ program
     "--lang <code>",
     "Target language for generated wiki content (e.g. \"Chinese\", \"ja\", \"zh-CN\"). Equivalent to setting LLMWIKI_OUTPUT_LANG.",
   )
-  .action(async (options: { review?: boolean; lang?: string }) => {
-    try {
-      applyLanguageOption(options.lang);
-      requireProvider();
-      await compileCommand({ review: options.review });
-    } catch (err) {
-      console.error(`\x1b[31mError:\x1b[0m ${err instanceof Error ? err.message : err}`);
-      process.exit(1);
-    }
-  });
+  .action(
+    async (cliOptions: {
+      review?: boolean;
+      lang?: string;
+      vault?: string;
+      output?: string;
+      include?: string;
+    }) => {
+      try {
+        applyLanguageOption(cliOptions.lang);
+        requireProvider();
+        await compileCommand(buildCompileOptions(cliOptions));
+      } catch (err) {
+        console.error(`\x1b[31mError:\x1b[0m ${err instanceof Error ? err.message : err}`);
+        process.exit(1);
+      }
+    },
+  );
 
 const reviewCommand = program
   .command("review")
@@ -78,10 +99,18 @@ reviewCommand
 
 reviewCommand
   .command("approve <id>")
-  .description("Approve a candidate and promote it into wiki/concepts/")
-  .action(async (id: string) => {
+  .description("Approve a candidate and promote it into the configured concepts/ directory")
+  .option(
+    "--vault <path>",
+    "Vault directory the candidate's citations resolve against. Defaults to ./sources or LLMWIKI_VAULT_DIR.",
+  )
+  .option(
+    "--output <path>",
+    "Output directory for compiled wiki/ artifacts. Defaults to ./wiki or LLMWIKI_OUTPUT_DIR.",
+  )
+  .action(async (id: string, cliOptions: { vault?: string; output?: string }) => {
     try {
-      await reviewApproveCommand(id);
+      await reviewApproveCommand(id, buildCompileOptions(cliOptions));
     } catch (err) {
       console.error(`\x1b[31mError:\x1b[0m ${err instanceof Error ? err.message : err}`);
       process.exit(1);
@@ -109,6 +138,25 @@ function applyLanguageOption(lang: string | undefined): void {
   if (lang && lang.trim().length > 0) {
     process.env.LLMWIKI_OUTPUT_LANG = lang.trim();
   }
+}
+
+/**
+ * Build a CompileOptions snapshot from CLI flags, falling back to environment
+ * variables when a flag was not passed. Empty strings are treated as unset so
+ * `--vault ""` does not silently mask a real env value.
+ */
+function buildCompileOptions(cli: {
+  review?: boolean;
+  vault?: string;
+  output?: string;
+  include?: string;
+}): CompileOptions {
+  return {
+    review: cli.review,
+    vault: cli.vault ?? process.env.LLMWIKI_VAULT_DIR ?? undefined,
+    output: cli.output ?? process.env.LLMWIKI_OUTPUT_DIR ?? undefined,
+    include: cli.include ?? process.env.LLMWIKI_INCLUDE ?? undefined,
+  };
 }
 
 /** API key env var required per provider. Null means no key needed. */

@@ -4,6 +4,7 @@ import path from "path";
 import os from "os";
 import { resolveLinks } from "../src/compiler/resolver.js";
 import { buildFrontmatter } from "../src/utils/markdown.js";
+import { resolveCompilePaths } from "../src/utils/paths.js";
 
 describe("resolveLinks", () => {
   let tmpDir: string;
@@ -32,7 +33,7 @@ describe("resolveLinks", () => {
     await writePage("alpha", "Alpha Concept", "This page mentions Beta Concept here.");
     await writePage("beta", "Beta Concept", "This page is about beta.");
 
-    await resolveLinks(tmpDir, ["alpha"], []);
+    await resolveLinks(resolveCompilePaths(tmpDir), ["alpha"], []);
     const content = await readPage("alpha");
     expect(content).toContain("[[beta|Beta Concept]]");
   });
@@ -41,7 +42,7 @@ describe("resolveLinks", () => {
     await writePage("alpha", "Alpha", "We discuss beta concept in depth.");
     await writePage("beta", "Beta Concept", "About beta.");
 
-    await resolveLinks(tmpDir, ["alpha"], []);
+    await resolveLinks(resolveCompilePaths(tmpDir), ["alpha"], []);
     const content = await readPage("alpha");
     expect(content).toContain("[[beta|Beta Concept]]");
   });
@@ -50,7 +51,7 @@ describe("resolveLinks", () => {
     await writePage("alpha", "Alpha", "Already linked: [[Beta Concept]] here.");
     await writePage("beta", "Beta Concept", "About beta.");
 
-    await resolveLinks(tmpDir, ["alpha"], []);
+    await resolveLinks(resolveCompilePaths(tmpDir), ["alpha"], []);
     const content = await readPage("alpha");
     // Should still have exactly one [[Beta Concept]], not nested
     const matches = content.match(/\[\[Beta Concept\]\]/g);
@@ -61,7 +62,7 @@ describe("resolveLinks", () => {
     await writePage("alpha", "Alpha", "The word Betamax should not be linked.");
     await writePage("beta", "Beta", "About beta.");
 
-    await resolveLinks(tmpDir, ["alpha"], []);
+    await resolveLinks(resolveCompilePaths(tmpDir), ["alpha"], []);
     const content = await readPage("alpha");
     expect(content).not.toContain("[[beta|Beta]]max");
     expect(content).toContain("Betamax");
@@ -74,7 +75,7 @@ describe("resolveLinks", () => {
     await writePage("alpha", "Alpha", `Info here. ${citation}`);
     await writePage("beta", "Beta Concept", "About beta.");
 
-    await resolveLinks(tmpDir, ["alpha"], []);
+    await resolveLinks(resolveCompilePaths(tmpDir), ["alpha"], []);
     const content = await readPage("alpha");
     expect(content).not.toContain("[[Beta Concept]]");
     expect(content).toContain(citation);
@@ -84,7 +85,7 @@ describe("resolveLinks", () => {
     await writePage("existing", "Existing", "This mentions New Concept here.");
     await writePage("new-concept", "New Concept", "Brand new.");
 
-    await resolveLinks(tmpDir, ["new-concept"], ["new-concept"]);
+    await resolveLinks(resolveCompilePaths(tmpDir), ["new-concept"], ["new-concept"]);
     const content = await readPage("existing");
     expect(content).toContain("[[new-concept|New Concept]]");
   });

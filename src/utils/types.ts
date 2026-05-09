@@ -117,6 +117,47 @@ export interface CompileOptions {
    * of mutating wiki/. Reviewers approve/reject via `llmwiki review`.
    */
   review?: boolean;
+  /**
+   * Override where the pipeline reads source markdown from. Defaults to
+   * `<root>/sources` so existing flat-sources projects keep working without
+   * setting anything. May be absolute or relative to `root`.
+   */
+  vault?: string;
+  /**
+   * Override where compiled `wiki/` artifacts (concepts, index, MOC) are
+   * written. Defaults to `<root>/wiki`. May be absolute or relative to `root`.
+   */
+  output?: string;
+  /**
+   * Optional glob (e.g. `Zephyr/**`) that scopes which vault notes are
+   * compiled. Matched against vault-relative paths via `path.matchesGlob`.
+   */
+  include?: string;
+}
+
+/**
+ * Resolved absolute paths the compile pipeline reads and writes.
+ *
+ * Built once at the entry point from `CompileOptions` and threaded through
+ * the pipeline so individual functions don't need to re-derive paths from
+ * `root` plus a constant. Lets the vault and output directories sit anywhere
+ * on disk — the project root only owns `.llmwiki/` (state + lock + candidates).
+ */
+export interface CompilePaths {
+  /** Project root — anchors `.llmwiki/` (state.json, lock, candidates). */
+  root: string;
+  /** Absolute path to the vault directory containing source markdown. */
+  vault: string;
+  /** Absolute path to the output directory containing compiled wiki pages. */
+  output: string;
+  /** Absolute path to `<output>/concepts`. */
+  conceptsDir: string;
+  /** Absolute path to `<output>/index.md`. */
+  indexFile: string;
+  /** Absolute path to `<output>/MOC.md`. */
+  mocFile: string;
+  /** Optional include glob applied to vault-relative paths. */
+  include?: string;
 }
 
 /**

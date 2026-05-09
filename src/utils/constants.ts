@@ -56,14 +56,17 @@ export const OPENAI_DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
  */
 export const OLLAMA_DEFAULT_TIMEOUT_MS = 30 * 60 * 1000;
 
-/** Directory names relative to the project root. */
-export const SOURCES_DIR = "sources";
+/**
+ * Directory names relative to the project root.
+ *
+ * `CONCEPTS_DIR` is retained for tests that build absolute concept-page
+ * paths from a temp root; pipeline code reads concepts from
+ * `CompilePaths.conceptsDir` instead.
+ */
 export const CONCEPTS_DIR = "wiki/concepts";
 export const LLMWIKI_DIR = ".llmwiki";
 export const STATE_FILE = ".llmwiki/state.json";
 export const LOCK_FILE = ".llmwiki/lock";
-export const INDEX_FILE = "wiki/index.md";
-export const MOC_FILE = "wiki/MOC.md";
 
 /** Pending review candidates awaiting approval/rejection. */
 export const CANDIDATES_DIR = ".llmwiki/candidates";
